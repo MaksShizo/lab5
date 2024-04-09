@@ -36,8 +36,6 @@ void GaussMPI(double* a, double* x, int n, int size, int rank) {
 
 	if (rank == 0)
 	{
-		int start = 1;
-		int end = start + blockSize;
 
 		double* temp_a = new double[blockSize * (N + 1)];
 		int index = 0;
