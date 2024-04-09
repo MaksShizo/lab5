@@ -4,52 +4,6 @@
 
 const int N = 10;
 
-void printMatrix(double A[N][N], int rows, int cols) {
-	for (int i = 0; i < rows; ++i) {
-		for (int j = 0; j < cols; ++j) {
-			std::cout << A[i][j] << " ";
-		}
-		std::cout << std::endl;
-	}
-}
-
-void FillAArr(double** a, int n) {
-	a[0] = new double[N];
-	for (int i = 1; i <= n; i++) {
-		a[i] = new double[N];
-		for (int j = 1; j <= n; j++) {
-			a[i][j] = rand() % 100;
-		}
-	}
-}
-
-bool is_equal(double x, double y) {
-	return fabs(x - y) < 0, 00000001;
-}
-
-bool CheckAnswers(double* x, double* x2, int n) {
-	for (int i = 1; i <= n; i++) {
-		if (!is_equal(x[i], x2[i]))
-			return false;
-	}
-	return true;
-}
-
-void FillBArr(double** a, double* x, int n) {
-	for (int i = 1; i <= n; i++) {
-		a[i][n + 1] = 0;
-		for (int j = 1; j <= n; j++) {
-			a[i][n + 1] += a[i][j] * x[j];
-		}
-	}
-}
-
-void FillXArr(double* x, int n) {
-	for (int i = 1; i <= n; i++) {
-		x[i] = rand() % 100;
-	}
-}
-
 void Gauss(double** a, double* x, int n) {
 	/* Прямой ход*/
 	unsigned int start = clock();
@@ -73,45 +27,6 @@ void Gauss(double** a, double* x, int n) {
 		x[i] = (x[i] - sum) / a[i][i];
 	}
 	std::cout << "Гаусс " << clock() - start << std::endl;
-}
-
-void LUDecomposition(double** a, int n) {
-	unsigned int start = clock();
-	for (int k = 0; k < n; k++) {
-#pragma omp parallel for
-		for (int i = k + 1; i < n; i++) {
-			double factor = a[i][k] / a[k][k];
-			a[i][k] = factor;
-			for (int j = k + 1; j < n; j++) {
-				a[i][j] -= factor * a[k][j];
-			}
-		}
-	}
-	std::cout << "LU - разложение " << clock() - start << std::endl;
-}
-
-void LUSolve(double** lu, double* b, double* x, int n) {
-	// Решение Ly=b
-	unsigned int start = clock();
-	for (int i = 0; i < n; i++) {
-		double sum = 0.0;
-#pragma omp parallel for reduction(+:sum)
-		for (int j = 0; j < i; j++) {
-			sum += lu[i][j] * x[j];
-		}
-		x[i] = b[i] - sum;
-	}
-
-	// Решение Ux=y
-	for (int i = n - 1; i >= 0; i--) {
-		double sum = 0.0;
-#pragma omp parallel for reduction(+:sum)
-		for (int j = i + 1; j < n; j++) {
-			sum += lu[i][j] * x[j];
-		}
-		x[i] = (x[i] - sum) / lu[i][i];
-	}
-	std::cout << "Решение с LU - разложением " << clock() - start << std::endl;
 }
 
 void GaussMPI(double* a, double* x, int n, int size, int rank) {
