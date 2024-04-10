@@ -1,134 +1,126 @@
 ﻿#include <iostream>
 #include <mpi.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
 
-int size, rank;
-const int N = 1000;
-double a[N][N], x[N], x1[N], x_check[N], a_check[N][N];
-int count_error = 0;
+const int N = 2000; // Размер матрицы
+double** A; // Двумерный массив для расширенной матрицы системы
+double X[N]; // Решение
+int countError = 0; // Количество ошибок
 
-void BackGauss()
-{
-	for (int i = N - 1; i >= 0; i--)
-	{
-		int count = 0;
-		x1[i] = x[i];
-		for (int j = i + 1; j < N; j++)
-		{
-			x1[i] -= a[i][j] * x1[j];
-
-		}
-		x1[i] = x1[i] / a[i][i];
-	}
+void deletearr() {
+    for (int i = 0; i < N; ++i) {
+        delete[] A[i];
+    }
+    delete[] A;
 }
 
-void CheckCountError() {
-	double sum = 0;
-	for (int i = 0; i < N; i++)
-	{
-		for (int j = 0; j < N; j++)
-		{
-			sum += x1[j] * a_check[i][j];
-		}
-		if (std::abs(sum - x_check[i]) > 1e-6)
-			count_error++;
-		sum = 0;
-	}
+void BackGauss() {
+    for (int i = N - 1; i >= 0; --i) {
+        X[i] = A[i][N];
+        for (int j = i + 1; j < N; ++j) {
+            X[i] -= A[i][j] * X[j];
+        }
+        X[i] /= A[i][i];
+    }
 }
 
-void GaussMPI(int N)
-{
-	MPI_Request request;
-	MPI_Status status;
-	float mp;
-	MPI_Barrier(MPI_COMM_WORLD);
-	for (int k = 0; k < N - 1; k++)
-	{
-		MPI_Bcast(&a[k][0], N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&x[k], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		if (rank == 0)
-		{
-			for (int p = 1; p < size; p++)
-			{
-				for (int i = k + 1 + p; i < N; i += size)
-				{
-					MPI_Isend(&a[i], N, MPI_DOUBLE, p, 0, MPI_COMM_WORLD, &request);
-					MPI_Wait(&request, &status);
-					MPI_Isend(&x[i], 1, MPI_DOUBLE, p, 0, MPI_COMM_WORLD, &request);
-					MPI_Wait(&request, &status);
-				}
-			}
-			for (int i = k + 1; i < N; i += size)
-			{
-				mp = a[i][k] / a[k][k];
-				for (int j = k; j < N; j++)
-				{
-					a[i][j] -= a[k][j] * mp;
-				}
-				x[i] -= x[k] * mp;
-			}
-			for (int p = 1; p < size; p++)
-			{
-				for (int i = k + 1 + p; i < N; i += size)
-				{
-					MPI_Recv(&a[i], N, MPI_DOUBLE, p, 1, MPI_COMM_WORLD, &status);
-					MPI_Recv(&x[i], 1, MPI_DOUBLE, p, 1, MPI_COMM_WORLD, &status);
-				}
-			}
-		}
-		else
-		{
-			for (int i = k + 1 + rank; i < N; i += size)
-			{
-				MPI_Recv(&a[i], N, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
-				MPI_Recv(&x[i], 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, &status);
-				mp = a[i][k] / a[k][k];
-				for (int j = k; j < N; j++)
-				{
-					a[i][j] -= a[k][j] * mp;
-				}
-				x[i] -= x[k] * mp;
-				MPI_Isend(&a[i], N, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD, &request);
-				MPI_Wait(&request, &status);
-				MPI_Isend(&x[i], 1, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD, &request);
-				MPI_Wait(&request, &status);
-			}
-		}
-		MPI_Barrier(MPI_COMM_WORLD);
-	}
+void CountError() {
+    double sum = 0;
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < N; ++j) {
+            sum += X[j] * A[i][j];
+        }
+        if (std::abs(sum - A[i][N]) > 1e-6) {
+            countError++;
+        }
+        sum = 0;
+    }
+    std::cout << "Error count:" << countError << std::endl;
 }
 
-int main(int argc, char* argv[])
-{
-	MPI_Init(&argc, &argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
-	unsigned long long usecstart, usecstop;
-	double startTime, endTime;
-	if (rank == 0)
-	{
-		for (int i = 0; i < N; i++)
-		{
-			for (int j = 0; j < N; j++)
-			{
-				a[i][j] = rand() % 100000 / 100.0;
-				a_check[i][j] = a[i][j];
-			}
-			x[i] = rand() % 100000 / 100.0;
-			x_check[i] = x[i];
-		}
-	}
-	startTime = MPI_Wtime();
-	GaussMPI(N);//implementing the gaussian elimination
-	if (rank == 0)
-	{
-		BackGauss();
-		endTime = MPI_Wtime();
-		CheckCountError();
-		printf("Time gaussMPI  = %f s Count Error %d", endTime - startTime, count_error);
-	}
-	MPI_Finalize(); //Finalizing the MPI
-	return 0;
+int main(int argc, char** argv) {
+    A = new double* [N];
+    for (int i = 0; i < N; ++i) {
+        A[i] = new double[N + 1];
+        for (int j = 0; j < N; ++j) {
+            A[i][j] = rand() % 10 + 1;
+        }
+        A[i][N] = rand() % N;
+    }
+    MPI_Init(&argc, &argv);
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    int blockSize = N / (size - 1);
+    if (N % (size - 1) != 0) {
+        std::cout << "Error count process. Take (Matrix size % (count process - 1) == 0)" << std::endl;
+        deletearr();
+        MPI_Finalize();
+        return -1;
+    }
+    if (rank == 0) {
+        double startT, endT;
+        startT = MPI_Wtime();
+        double* temp_a = new double[blockSize * (N + 1)];
+        for (int proc = 1; proc < size; ++proc) {
+            for (int i = 0; i < blockSize; ++i)
+                for (int j = 0; j < N + 1; ++j)
+                {
+                    temp_a[i] = A[i][j];
+                }
+            MPI_Send(temp_a, blockSize * (N + 1), MPI_DOUBLE, proc, 0, MPI_COMM_WORLD);
+        }
+        for (int proc = 1; proc < size; ++proc) {
+            MPI_Recv(temp_a, blockSize * (N + 1), MPI_DOUBLE, proc, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            for (int i = 0; i < blockSize; ++i)
+                for (int j = 0; j < N + 1; ++j) {
+                    A[i][j] = temp_a[i];
+                }
+        }
+        delete[] temp_a;
+        BackGauss();
+        endT = MPI_Wtime();
+        std::cout << "Time work " << endT - startT << " s" << std::endl;
+        CountError();
+    }
+    else {
+        int start = blockSize * (rank - 1);
+        int finish = rank * blockSize - 1;
+        double* temp_a = new double[blockSize * (N + 1)];
+        double* temp_b = new double[blockSize * (N + 1)];
+        MPI_Recv(temp_a, blockSize * (N + 1), MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUSES_IGNORE);
+        for (int proc = 1; proc < rank; ++proc) {
+            MPI_Recv(temp_b, blockSize * (N + 1), MPI_DOUBLE, proc, 0, MPI_COMM_WORLD, MPI_STATUSES_IGNORE);
+            for (int i = 0; i < blockSize; ++i) {
+                for (int j = 0; j < blockSize; ++j) {
+                    double ratio = temp_b[i * N + j + blockSize * (proc - 1)];
+                    for (int k = N + 1; k >= j; --k) {
+                        temp_a[i * N + k] -= ratio * temp_b[j * N + k];
+                    }
+                }
+            }
+        }
+        delete[] temp_b;
+        int counter = 0;
+        for (int i = 0; i < blockSize; ++i) {
+            double ratio = temp_a[i * N + i + start + counter];
+            for (int j = N; j >= start + counter; --j) {
+                temp_a[i * N + j] /= ratio;
+            }
+            for (int j = i + 1; j < blockSize; ++j) {
+                ratio = temp_a[j * N + start + counter];
+                for (int k = N; k >= start + counter; --k) {
+                    temp_a[j * N + k] -= ratio * temp_a[i * N + k];
+                }
+            }
+        }
+        for (int proc = rank + 1; proc < size; ++proc) {
+            MPI_Send(temp_a, blockSize * (N + 1), MPI_DOUBLE, proc, 0, MPI_COMM_WORLD);
+        }
+        MPI_Send(temp_a, blockSize * (N + 1), MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+        delete[] temp_a;
+    }
+
+    deletearr();
+    MPI_Finalize();
+    return 0;
 }
