@@ -1,7 +1,7 @@
 ﻿#include <iostream>
 #include <mpi.h>
 
-const int N = 2000; // Размер матрицы
+const int N = 5040; // Размер матрицы
 double** A; // Двумерный массив для расширенной матрицы системы
 double X[N]; // Решение
 int countError = 0; // Количество ошибок
