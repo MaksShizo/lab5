@@ -31,7 +31,7 @@ void Gauss(double** a, double* x, int n) {
 
 void GaussMPI(double* a, double* x, int n, int size, int rank) {
 
-	int blockSize = n / size;
+	int blockSize = n / (size-1);
 	int remainder = n % size;
 
 	if (rank == 0)
@@ -72,8 +72,8 @@ void GaussMPI(double* a, double* x, int n, int size, int rank) {
 	}
 	else
 	{
-		int start = rank * (blockSize - 1);
-		int end = start + blockSize;
+		int start = (rank - 1) * blockSize;
+		int end = rank * blockSize - 1;
 
 
 
